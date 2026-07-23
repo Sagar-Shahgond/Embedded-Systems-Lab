@@ -1,25 +1,66 @@
 import serial
-from config import COM_PORT, BAUD_RATE
+import serial.tools.list_ports
+import time
+from config import BAUD_RATE, COM_PORT
 
-ser = serial.Serial(COM_PORT, BAUD_RATE, timeout=1)
+class SerialReader:
 
-def read_packet():
-    try:
-        line = ser.readline().decode().strip()
+    def __init__(self):
 
-        if not line:
-            return None
+        if COM_PORT is None:
+            self.port = self.find_arduino()
+        else:
+            self.port = COM_PORT
 
-        parts = line.split(",")
+        if self.port is None:
+            raise Exception("Arduino not found!")
 
-        if len(parts) != 3:
-            return None
+        print(f"Connecting to {self.port}")
 
-        throttle = int(parts[0])
-        brake = int(parts[1])
-        direction = int(parts[2])
+        self.ser = serial.Serial(
+            self.port,
+            BAUD_RATE,
+            timeout=1
+        )
 
-        return throttle, brake, direction
+        time.sleep(2)
 
-    except Exception:
+    def find_arduino(self):
+
+        ports = serial.tools.list_ports.comports()
+
+        for port in ports:
+
+            print(f"Found: {port.device} -> {port.description}")
+
+            if (
+                "Arduino" in port.description or
+                "USB Serial" in port.description or
+                "Nano" in port.description
+            ):
+                return port.device
+
         return None
+
+    def read(self):
+
+        try:
+
+            line = self.ser.readline().decode().strip()
+
+            if line == "":
+                return None
+
+            data = line.split(",")
+
+            if len(data) != 3:
+                return None
+
+            throttle = int(data[0])
+            brake = bool(int(data[1]))
+            direction = int(data[2])
+
+            return throttle, brake, direction
+
+        except:
+            return None
